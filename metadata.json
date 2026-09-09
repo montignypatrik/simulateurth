@@ -1,0 +1,6 @@
+{
+  "name": "Simulateur tarif Horaire",
+  "description": "Simulateur tarif horaire et calendrier de facturation médicale conforme Facnet 2.0, Facnet 3.0 et RAMQ.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
