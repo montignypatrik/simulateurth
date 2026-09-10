@@ -29,6 +29,42 @@ const PLAGES: PlageDef[] = [
   { id: 'SO', label: 'SO', startMin: 20 * 60, endMin: 24 * 60 }, // 20h - 24h
 ];
 
+const TEMPLATE_STORAGE_KEY = 'demande_active_template';
+
+const TEMPLATE_OPTIONS: {
+  id: TemplateId;
+  label: string;
+  frDescription: string;
+  enDescription: string;
+  activeClass: string;
+  dotClass: string;
+}[] = [
+  {
+    id: 'facnet2',
+    label: 'Facnet 2.0',
+    frDescription: 'Tableau compact avec cases a cocher.',
+    enDescription: 'Compact table with checkboxes.',
+    activeClass: 'bg-[#004d47] text-white border-[#003f3a]',
+    dotClass: 'bg-emerald-300',
+  },
+  {
+    id: 'facnet3',
+    label: 'Facnet 3.0',
+    frDescription: 'Fiches modernes avec blocs de creneaux.',
+    enDescription: 'Modern cards with time-slot blocks.',
+    activeClass: 'bg-[#18392b] text-white border-[#132e23]',
+    dotClass: 'bg-emerald-400',
+  },
+  {
+    id: 'ramq',
+    label: 'RAMQ',
+    frDescription: 'Format portail RAMQ avec grille numerotee.',
+    enDescription: 'RAMQ portal format with numbered grid.',
+    activeClass: 'bg-[#005a9c] text-white border-[#004a82]',
+    dotClass: 'bg-sky-300',
+  },
+];
+
 const JOUR_ABBR_FR: { [key: number]: string } = {
   0: 'dim.',
   1: 'lun.',
@@ -184,9 +220,16 @@ export const ModeleDemandeView: React.FC<ModeleDemandeViewProps> = ({
 }) => {
   const isFr = lang === 'fr';
   const [selectedDemandeIndex, setSelectedDemandeIndex] = useState(0);
+  const [isTemplatePromptOpen, setIsTemplatePromptOpen] = useState(() => {
+    try {
+      return !localStorage.getItem(TEMPLATE_STORAGE_KEY);
+    } catch {
+      return true;
+    }
+  });
   const [selectedTemplate, setSelectedTemplate] = useState<TemplateId>(() => {
     try {
-      const saved = localStorage.getItem('demande_active_template');
+      const saved = localStorage.getItem(TEMPLATE_STORAGE_KEY);
       if (saved === 'facnet2' || saved === 'facnet3' || saved === 'ramq') {
         return saved;
       }
@@ -199,10 +242,15 @@ export const ModeleDemandeView: React.FC<ModeleDemandeViewProps> = ({
   const handleSelectTemplate = (template: TemplateId) => {
     setSelectedTemplate(template);
     try {
-      localStorage.setItem('demande_active_template', template);
+      localStorage.setItem(TEMPLATE_STORAGE_KEY, template);
     } catch {
       // ignore
     }
+  };
+
+  const handleInitialTemplateChoice = (template: TemplateId) => {
+    handleSelectTemplate(template);
+    setIsTemplatePromptOpen(false);
   };
 
   // Build the Demandes:
@@ -394,6 +442,72 @@ export const ModeleDemandeView: React.FC<ModeleDemandeViewProps> = ({
 
   return (
     <div className="flex-1 bg-neutral-100/70 text-slate-800 flex flex-col font-sans">
+      {isTemplatePromptOpen && (
+        <div className="fixed inset-0 z-50 bg-slate-950/50 backdrop-blur-xs flex items-center justify-center p-4">
+          <div className="w-full max-w-xl bg-white rounded-2xl border border-slate-200 shadow-2xl overflow-hidden">
+            <div className="px-5 sm:px-6 py-5 border-b border-slate-200 bg-slate-50">
+              <div className="flex items-start gap-3">
+                <div className="w-10 h-10 rounded-xl bg-[#0077c8] text-white flex items-center justify-center shrink-0 shadow-xs">
+                  <Layers className="w-5 h-5" />
+                </div>
+                <div>
+                  <h2 className="text-base sm:text-lg font-bold text-slate-900">
+                    {isFr
+                      ? 'Quelle plateforme prevoyez-vous utiliser ?'
+                      : 'Which platform do you plan to use?'}
+                  </h2>
+                  <p className="text-xs sm:text-sm text-slate-500 mt-1 leading-relaxed">
+                    {isFr
+                      ? 'Votre choix sera applique automatiquement au modele de demande. Vous pourrez toujours le changer avec le selecteur en haut de la page.'
+                      : 'Your choice will be applied automatically to the request model. You can still change it with the selector at the top of the page.'}
+                  </p>
+                </div>
+              </div>
+            </div>
+
+            <div className="p-4 sm:p-5 grid gap-3">
+              {TEMPLATE_OPTIONS.map((option) => (
+                <button
+                  key={`template-prompt-${option.id}`}
+                  type="button"
+                  onClick={() => handleInitialTemplateChoice(option.id)}
+                  className={`w-full text-left rounded-xl border p-4 transition-all cursor-pointer shadow-xs hover:shadow-md ${
+                    selectedTemplate === option.id
+                      ? option.activeClass
+                      : 'bg-white hover:bg-slate-50 border-slate-200 text-slate-800'
+                  }`}
+                >
+                  <div className="flex items-center justify-between gap-4">
+                    <div className="flex items-center gap-3 min-w-0">
+                      <span className={`w-3 h-3 rounded-full shrink-0 ${option.dotClass}`} />
+                      <div className="min-w-0">
+                        <div className="text-sm font-bold">{option.label}</div>
+                        <div
+                          className={`text-xs mt-0.5 ${
+                            selectedTemplate === option.id ? 'text-white/80' : 'text-slate-500'
+                          }`}
+                        >
+                          {isFr ? option.frDescription : option.enDescription}
+                        </div>
+                      </div>
+                    </div>
+                    <span
+                      className={`text-xs font-bold px-2.5 py-1 rounded-lg border shrink-0 ${
+                        selectedTemplate === option.id
+                          ? 'bg-white/15 border-white/25 text-white'
+                          : 'bg-slate-100 border-slate-200 text-slate-600'
+                      }`}
+                    >
+                      {isFr ? 'Choisir' : 'Choose'}
+                    </span>
+                  </div>
+                </button>
+              ))}
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* Top Bar with Facnet Branding */}
       <header className="bg-[#1b293c] text-white border-b border-[#25374e] px-4 sm:px-6 py-2.5 flex items-center justify-between shadow-md sticky top-0 z-30">
         <div className="flex items-center gap-3">
