@@ -1,4 +1,4 @@
-# Simulateur TH
+# simulateurth
 
 Static React app for logging hourly work periods and generating Facnet/RAMQ request models.
 
