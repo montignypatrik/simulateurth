@@ -122,25 +122,16 @@ export default function App() {
   // Active page: 'calendar' or 'modele_demande'
   const [activePage, setActivePage] = useState<ActivePage>('calendar');
 
-  // Logged hours state with localStorage persistence
-  const [loggedHours, setLoggedHours] = useState<LoggedHours[]>(() => {
-    try {
-      const saved = localStorage.getItem('calendar_logged_hours');
-      if (saved) return JSON.parse(saved);
-    } catch {
-      // ignore
-    }
-    return DEFAULT_LOGGED_HOURS;
-  });
+  // Logged hours are session-only; each page load starts with an empty calendar.
+  const [loggedHours, setLoggedHours] = useState<LoggedHours[]>([]);
 
-  // Save to localStorage when loggedHours changes
   useEffect(() => {
     try {
-      localStorage.setItem('calendar_logged_hours', JSON.stringify(loggedHours));
+      localStorage.removeItem('calendar_logged_hours');
     } catch {
       // ignore
     }
-  }, [loggedHours]);
+  }, []);
 
   // Reset modal state & toast feedback
   const [isResetModalOpen, setIsResetModalOpen] = useState(false);
@@ -166,11 +157,6 @@ export default function App() {
       setToastMessage(isFr ? 'Calendrier vidé avec succès' : 'Calendar cleared successfully');
     } else {
       setLoggedHours(DEFAULT_LOGGED_HOURS);
-      try {
-        localStorage.setItem('calendar_logged_hours', JSON.stringify(DEFAULT_LOGGED_HOURS));
-      } catch {
-        // ignore
-      }
       setToastMessage(isFr ? 'Données d’exemple rétablies' : 'Sample shifts restored');
     }
     setCurrentDate(new Date(2026, 8, 3));

@@ -1,6 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { X, Clock, Calendar as CalendarIcon, Check, Stethoscope, Briefcase, Sparkles } from 'lucide-react';
-import { getStatutoryHoliday } from '../data/statutoryHolidays';
+import { X, Clock, Calendar as CalendarIcon, Check, Stethoscope, Briefcase } from 'lucide-react';
 
 export interface LoggedHours {
   id: string;
@@ -269,25 +268,6 @@ export const LogHoursModal: React.FC<LogHoursModalProps> = ({
               onChange={(e) => setDate(e.target.value)}
               className="w-full px-3 py-2 border border-slate-300 rounded-lg text-xs sm:text-sm font-medium focus:outline-none focus:ring-2 focus:ring-indigo-500 text-slate-900 bg-white"
             />
-            {(() => {
-              const holiday = getStatutoryHoliday(date);
-              if (!holiday) return null;
-              return (
-                <div className="mt-2 p-2.5 bg-amber-50 border border-amber-200 rounded-lg text-amber-900 text-[11px] flex items-start gap-2 shadow-2xs">
-                  <Sparkles className="w-4 h-4 text-amber-600 shrink-0 mt-0.5" />
-                  <div>
-                    <span className="font-bold">
-                      {isFr ? 'Fête légale :' : 'Statutory Holiday:'} {isFr ? holiday.name : holiday.nameEn}
-                    </span>
-                    <p className="text-amber-800 text-[10.5px] mt-0.5 leading-snug">
-                      {isFr
-                        ? 'Ce jour est une fête légale officielle. Le secteur férié majoré (31 de 8h à 24h, 42 de 0h à 8h) s\'applique automatiquement dans les formulaires RAMQ / Facnet.'
-                        : 'Official statutory holiday. Premium holiday sector (31 from 8h-24h, 42 from 0h-8h) applies automatically in RAMQ / Facnet claims.'}
-                    </p>
-                  </div>
-                </div>
-              );
-            })()}
           </div>
 
           {/* Beginning and End Hours Grid */}

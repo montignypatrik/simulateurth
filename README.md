@@ -1,20 +1,29 @@
-<div align="center">
-<img width="1200" height="475" alt="GHBanner" src="https://ai.google.dev/static/site-assets/images/share-ais-513315318.png" />
-</div>
+# Simulateur TH
 
-# Run and deploy your AI Studio app
-
-This contains everything you need to run your app locally.
-
-View your app in AI Studio: https://ai.studio/apps/df1738aa-b8b0-494e-a8a9-69541805fb77
+Static React app for logging hourly work periods and generating Facnet/RAMQ request models.
 
 ## Run Locally
 
-**Prerequisites:**  Node.js
+Prerequisite: Node.js 22 or newer.
 
+```bash
+npm install
+npm run dev
+```
 
-1. Install dependencies:
-   `npm install`
-2. Set the `GEMINI_API_KEY` in [.env.local](.env.local) to your Gemini API key
-3. Run the app:
-   `npm run dev`
+## Build
+
+```bash
+npm run build
+```
+
+The static site is generated in `dist/`.
+
+## Publish Free On GitHub Pages
+
+1. Push this repository to GitHub.
+2. In the GitHub repository, open **Settings > Pages**.
+3. Set **Source** to **GitHub Actions**.
+4. Push to `main` or `master`, or run the **Deploy to GitHub Pages** workflow manually.
+
+The app has no backend requirement and no API key requirement. It can be hosted as a static page on GitHub Pages.
