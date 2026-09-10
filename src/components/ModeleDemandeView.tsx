@@ -30,6 +30,7 @@ const PLAGES: PlageDef[] = [
 ];
 
 const TEMPLATE_STORAGE_KEY = 'demande_active_template';
+const TEMPLATE_PROMPT_ANSWERED_KEY = 'demande_platform_prompt_answered';
 
 const TEMPLATE_OPTIONS: {
   id: TemplateId;
@@ -222,7 +223,7 @@ export const ModeleDemandeView: React.FC<ModeleDemandeViewProps> = ({
   const [selectedDemandeIndex, setSelectedDemandeIndex] = useState(0);
   const [isTemplatePromptOpen, setIsTemplatePromptOpen] = useState(() => {
     try {
-      return !localStorage.getItem(TEMPLATE_STORAGE_KEY);
+      return localStorage.getItem(TEMPLATE_PROMPT_ANSWERED_KEY) !== 'true';
     } catch {
       return true;
     }
@@ -250,6 +251,11 @@ export const ModeleDemandeView: React.FC<ModeleDemandeViewProps> = ({
 
   const handleInitialTemplateChoice = (template: TemplateId) => {
     handleSelectTemplate(template);
+    try {
+      localStorage.setItem(TEMPLATE_PROMPT_ANSWERED_KEY, 'true');
+    } catch {
+      // ignore
+    }
     setIsTemplatePromptOpen(false);
   };
 
