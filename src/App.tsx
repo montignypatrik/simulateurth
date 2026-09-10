@@ -38,6 +38,7 @@ const HOUR_HEIGHT = 56; // pixels per hour row
 
 const WEEK_DAYS_FR = ['Dim', 'Lun', 'Mar', 'Mer', 'Jeu', 'Ven', 'Sam'];
 const WEEK_DAYS_EN = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
+const DEMANDE_PLATFORM_PROMPT_ANSWERED_KEY = 'demande_platform_prompt_answered';
 
 // Default sample shifts for restoring the calendar
 const DEFAULT_LOGGED_HOURS: LoggedHours[] = [
@@ -147,6 +148,12 @@ export default function App() {
   };
 
   const handleResetCalendar = (mode: 'empty' | 'restore') => {
+    try {
+      localStorage.removeItem(DEMANDE_PLATFORM_PROMPT_ANSWERED_KEY);
+    } catch {
+      // ignore
+    }
+
     if (mode === 'empty') {
       setLoggedHours([]);
       try {
