@@ -132,8 +132,10 @@ export const FacnetHeader: React.FC<FacnetHeaderProps> = ({
             {/* Today Button */}
             <button
               id="today-btn"
+              type="button"
               onClick={onToday}
-              className="px-3 py-1.5 text-xs font-semibold text-slate-200 hover:text-white bg-[#243449] hover:bg-[#2d415b] border border-[#354c69] rounded-lg transition-colors shadow-2xs cursor-pointer"
+              title={isFr ? "Revenir à la date d'aujourd'hui" : 'Jump to today'}
+              className="px-3 py-1.5 text-xs font-semibold text-slate-200 hover:text-white bg-[#243449] hover:bg-[#2d415b] active:scale-95 border border-[#354c69] rounded-lg transition-all shadow-2xs cursor-pointer"
             >
               {isFr ? "Aujourd'hui" : 'Today'}
             </button>

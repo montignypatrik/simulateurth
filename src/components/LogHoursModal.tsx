@@ -135,7 +135,16 @@ export const LogHoursModal: React.FC<LogHoursModalProps> = ({
 }) => {
   const isFr = lang === 'fr';
 
-  const [date, setDate] = useState<string>(initialDate || '2026-09-03');
+  const [date, setDate] = useState<string>(
+    initialDate ||
+      (() => {
+        const d = new Date();
+        const y = d.getFullYear();
+        const m = (d.getMonth() + 1).toString().padStart(2, '0');
+        const day = d.getDate().toString().padStart(2, '0');
+        return `${y}-${m}-${day}`;
+      })()
+  );
   const [startTime, setStartTime] = useState<string>(initialStartTime);
   const [endTime, setEndTime] = useState<string>(initialEndTime);
   const [pratique, setPratique] = useState<string>(initialPratique);

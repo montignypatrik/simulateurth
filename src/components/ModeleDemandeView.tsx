@@ -358,15 +358,6 @@ export const ModeleDemandeView: React.FC<ModeleDemandeViewProps> = ({
 
           // If there is activity in this plage, create a row!
           if (matchingLogs.length > 0) {
-            // Build the 3 slots (# Code Secteur Heures)
-            const slot1Num = itemCounter++;
-            const slot2Num = itemCounter++;
-            const slot3Num = itemCounter++;
-
-            const match1 = matchingLogs[0];
-            const match2 = matchingLogs[1];
-            const match3 = matchingLogs[2];
-
             const defCode =
               demandPratique === 'Cabinet'
                 ? '072101'
@@ -374,48 +365,78 @@ export const ModeleDemandeView: React.FC<ModeleDemandeViewProps> = ({
                 ? '53030'
                 : '101030';
 
-            const code1 = match1 ? extractCode(match1.log.activite, defCode) : '';
-            const code2 = match2 ? extractCode(match2.log.activite, defCode) : '';
-            const code3 = match3 ? extractCode(match3.log.activite, defCode) : '';
+            // Group matching logs by activity code:
+            // Medical billing rule: logs with the same activity code are combined together on the same ref.
+            // We advance to the next ref only when the activity code is different!
+            const codeGroupsMap = new Map<string, { code: string; totalHours: number }>();
 
-            const slot1: DemandeRowSlot = {
-              slotNum: slot1Num,
-              code: code1,
-              secteur: match1
-                ? calculateSecteur(dateStr, plage.id, code1, demandPratique)
-                : '',
-              heures: match1 ? match1.hoursInPlage : '',
-            };
-
-            const slot2: DemandeRowSlot = {
-              slotNum: slot2Num,
-              code: code2,
-              secteur: match2
-                ? calculateSecteur(dateStr, plage.id, code2, demandPratique)
-                : '',
-              heures: match2 ? match2.hoursInPlage : '',
-            };
-
-            const slot3: DemandeRowSlot = {
-              slotNum: slot3Num,
-              code: code3,
-              secteur: match3
-                ? calculateSecteur(dateStr, plage.id, code3, demandPratique)
-                : '',
-              heures: match3 ? match3.hoursInPlage : '',
-            };
-
-            const rowTotal = matchingLogs.reduce((sum, m) => sum + m.hoursInPlage, 0);
-
-            rows.push({
-              rowId: `${dateStr}_${plage.id}`,
-              dateStr,
-              quantiemeDisplay: formatQuantieme(dateStr, isFr),
-              mode: 'TH',
-              selectedPlage: plage.id,
-              slots: [slot1, slot2, slot3],
-              totalHeures: Math.round(rowTotal * 100) / 100,
+            matchingLogs.forEach(({ log, hoursInPlage }) => {
+              const code = extractCode(log.activite, defCode);
+              if (!codeGroupsMap.has(code)) {
+                codeGroupsMap.set(code, { code, totalHours: 0 });
+              }
+              const currentGroup = codeGroupsMap.get(code)!;
+              currentGroup.totalHours += hoursInPlage;
             });
+
+            const uniqueCodeGroups = Array.from(codeGroupsMap.values()).map((g) => ({
+              code: g.code,
+              heures: Math.round(g.totalHours * 100) / 100,
+            }));
+
+            // In case there are > 3 different activity codes in the same plage, chunk into rows of 3 slots
+            for (let chunkIdx = 0; chunkIdx < uniqueCodeGroups.length; chunkIdx += 3) {
+              const chunk = uniqueCodeGroups.slice(chunkIdx, chunkIdx + 3);
+              const slot1Data = chunk[0] || null;
+              const slot2Data = chunk[1] || null;
+              const slot3Data = chunk[2] || null;
+
+              const slot1Num = itemCounter++;
+              const slot2Num = itemCounter++;
+              const slot3Num = itemCounter++;
+
+              const slot1: DemandeRowSlot = {
+                slotNum: slot1Num,
+                code: slot1Data ? slot1Data.code : '',
+                secteur: slot1Data
+                  ? calculateSecteur(dateStr, plage.id, slot1Data.code, demandPratique)
+                  : '',
+                heures: slot1Data ? slot1Data.heures : '',
+              };
+
+              const slot2: DemandeRowSlot = {
+                slotNum: slot2Num,
+                code: slot2Data ? slot2Data.code : '',
+                secteur: slot2Data
+                  ? calculateSecteur(dateStr, plage.id, slot2Data.code, demandPratique)
+                  : '',
+                heures: slot2Data ? slot2Data.heures : '',
+              };
+
+              const slot3: DemandeRowSlot = {
+                slotNum: slot3Num,
+                code: slot3Data ? slot3Data.code : '',
+                secteur: slot3Data
+                  ? calculateSecteur(dateStr, plage.id, slot3Data.code, demandPratique)
+                  : '',
+                heures: slot3Data ? slot3Data.heures : '',
+              };
+
+              const chunkTotal = chunk.reduce((sum, c) => sum + c.heures, 0);
+
+              rows.push({
+                rowId:
+                  chunkIdx === 0
+                    ? `${dateStr}_${plage.id}`
+                    : `${dateStr}_${plage.id}_${chunkIdx}`,
+                dateStr,
+                quantiemeDisplay: formatQuantieme(dateStr, isFr),
+                mode: 'TH',
+                selectedPlage: plage.id,
+                slots: [slot1, slot2, slot3],
+                totalHeures: Math.round(chunkTotal * 100) / 100,
+              });
+            }
           }
         });
       });

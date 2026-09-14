@@ -83,8 +83,8 @@ function capitalize(s: string): string {
 }
 
 export default function App() {
-  // Reference today date: September 3, 2026
-  const today = new Date(2026, 8, 3);
+  // Reference today date: current actual date
+  const [today, setToday] = useState<Date>(() => new Date());
 
   // App language state: French by default with English toggle
   const [lang, setLang] = useState<Language>(() => {
@@ -113,9 +113,9 @@ export default function App() {
 
   const isFr = lang === 'fr';
 
-  // Active viewing date & selected date
-  const [currentDate, setCurrentDate] = useState<Date>(() => new Date(2026, 8, 3));
-  const [selectedDate, setSelectedDate] = useState<Date>(() => new Date(2026, 8, 3));
+  // Active viewing date & selected date (defaults to current actual date)
+  const [currentDate, setCurrentDate] = useState<Date>(() => new Date());
+  const [selectedDate, setSelectedDate] = useState<Date>(() => new Date());
 
   // Active view: 'day' | 'week' | 'month' (default: weekly display)
   const [view, setView] = useState<CalendarView>('week');
@@ -162,12 +162,15 @@ export default function App() {
         // ignore
       }
       setToastMessage(isFr ? 'Calendrier vidé avec succès' : 'Calendar cleared successfully');
+      const now = new Date();
+      setCurrentDate(now);
+      setSelectedDate(now);
     } else {
       setLoggedHours(DEFAULT_LOGGED_HOURS);
       setToastMessage(isFr ? 'Données d’exemple rétablies' : 'Sample shifts restored');
+      setCurrentDate(new Date(2026, 8, 3));
+      setSelectedDate(new Date(2026, 8, 3));
     }
-    setCurrentDate(new Date(2026, 8, 3));
-    setSelectedDate(new Date(2026, 8, 3));
     setIsResetModalOpen(false);
 
     setTimeout(() => {
@@ -177,7 +180,7 @@ export default function App() {
 
   // Modal state
   const [isModalOpen, setIsModalOpen] = useState(false);
-  const [modalDate, setModalDate] = useState<string>('2026-09-03');
+  const [modalDate, setModalDate] = useState<string>(() => toDateKey(new Date()));
   const [modalStartTime, setModalStartTime] = useState<string>('08:00');
   const [modalEndTime, setModalEndTime] = useState<string>('16:00');
   const [modalPratique, setModalPratique] = useState<string>('CHSLD');
@@ -432,9 +435,18 @@ export default function App() {
   };
 
   const handleToday = () => {
-    const todayDate = new Date(2026, 8, 3);
+    const todayDate = new Date();
+    setToday(todayDate);
     setCurrentDate(todayDate);
     setSelectedDate(todayDate);
+    if (activePage !== 'calendar') {
+      setActivePage('calendar');
+    }
+    if (timelineScrollRef.current) {
+      const currentHour = todayDate.getHours();
+      const targetHour = currentHour >= 6 && currentHour <= 21 ? Math.max(0, currentHour - 1) : 7;
+      timelineScrollRef.current.scrollTo({ top: targetHour * HOUR_HEIGHT, behavior: 'smooth' });
+    }
   };
 
   // Header title formatting based on language
@@ -1198,7 +1210,13 @@ export default function App() {
             <span className="text-slate-300">•</span>
             <div className="flex items-center gap-1.5">
               <span className="font-semibold text-slate-900">
-                {isFr ? "Heures consignées aujourd'hui :" : 'Hours Logged Today:'}
+                {isSameDay(selectedDate, today)
+                  ? isFr
+                    ? "Heures consignées aujourd'hui :"
+                    : 'Hours Logged Today:'
+                  : isFr
+                  ? 'Heures consignées pour ce jour :'
+                  : 'Hours Logged for Selected Day:'}
               </span>
               <span className="text-[#0077c8] font-bold font-mono">
                 {getLogsForDate(selectedDate).reduce(
