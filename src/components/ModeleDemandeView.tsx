@@ -145,7 +145,10 @@ function calculateOverlapHours(shiftStart: string, shiftEnd: string, plageStartM
 
 // Logic for secteur based on day, plage, code, and pratique:
 // - For code 072101 (Activités de fonctionnement en GMF) or practice Cabinet: secteur is ALWAYS 0
-// - For any code 043 (Tâches médico-administratives et hospitalières, e.g. 101043, 53043, 263043): secteur is ALWAYS 0
+// - For codes 043 (Tâches médico-administratives et hospitalières: 263043, 53043, 101043):
+//   secteur 0 ONLY during the practice's regular weekday day period (no majoration).
+//   Evenings, weekends and holidays follow the practice's normal secteur table below
+//   (with their majorations) instead.
 // - For Programmes en CLSC (pratique CLSC or code starting with 263 / Toxicomanie):
 //     - En semaine de 8h à 18h (plages AM, PM) = 1 (Majoration n/a)
 //     - Lundi, mardi, mercredi et jeudi de 18h à 20h (plage PM) = 23 (Majoration 16%)
@@ -179,18 +182,16 @@ export function calculateSecteur(
     return '0';
   }
 
-  // Sector rule: any code 043 (Tâches médico-administratives et hospitalières) is ALWAYS 0
-  if (
-    code === '53043' ||
-    code?.startsWith('53043') ||
+  // Codes 043 (Tâches médico-administratives et hospitalières):
+  // secteur 0 applies only during the practice's regular weekday day period (no majoration).
+  // Evenings, weekends and holidays follow the practice's secteur table instead.
+  const isAdminTask =
     code === '263043' ||
     code?.startsWith('263043') ||
+    code === '53043' ||
+    code?.startsWith('53043') ||
     code === '101043' ||
-    code?.startsWith('101043') ||
-    code?.includes('043')
-  ) {
-    return '0';
-  }
+    code?.startsWith('101043');
 
   const d = parseLocalDate(dateStr);
   const day = d.getDay(); // 0 = Sunday, 1 = Monday, ..., 5 = Friday, 6 = Saturday
@@ -211,8 +212,8 @@ export function calculateSecteur(
 
     // Weekdays (Monday to Friday)
     if (plageId === 'AM') {
-      // En semaine de 8h à 18h = 1 (n/a Majoration)
-      return '1';
+      // En semaine de 8h à 18h = 1 (n/a Majoration); codes 043 = 0
+      return isAdminTask ? '0' : '1';
     }
 
     if (plageId === 'PM') {
@@ -224,10 +225,11 @@ export function calculateSecteur(
         return '23';
       }
       if (endHourMin !== undefined && endHourMin <= 18 * 60) {
-        return '1';
+        // En semaine de 8h à 18h = 1 (n/a Majoration); codes 043 = 0
+        return isAdminTask ? '0' : '1';
       }
-      // Default: En semaine de 8h à 18h = 1
-      return '1';
+      // Default: En semaine de 8h à 18h = 1; codes 043 = 0
+      return isAdminTask ? '0' : '1';
     }
 
     if (plageId === 'SO') {
@@ -265,8 +267,8 @@ export function calculateSecteur(
     if (pratique === 'Soins palliatifs') {
       return '0';
     }
-    // CHSLD: En semaine de 8h à 20h = 4
-    return '4';
+    // CHSLD: En semaine de 8h à 20h = 4; codes 043 = 0
+    return isAdminTask ? '0' : '4';
   }
 
   if (plageId === 'SO') {
