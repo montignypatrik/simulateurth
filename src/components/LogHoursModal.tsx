@@ -1,12 +1,13 @@
 import React, { useState, useEffect } from 'react';
-import { X, Clock, Calendar as CalendarIcon, Check, Stethoscope, Briefcase } from 'lucide-react';
+import { X, Clock, Calendar as CalendarIcon, Check, Stethoscope, Briefcase, Layers } from 'lucide-react';
 
 export interface LoggedHours {
   id: string;
   date: string; // YYYY-MM-DD
   startTime: string; // HH:mm (24h format, e.g. "08:00")
   endTime: string; // HH:mm (24h format, e.g. "16:30")
-  pratique: string; // "CHSLD" | "Cabinet"
+  pratique: string; // "CHSLD" | "CLSC" | "Cabinet" | "Soins palliatifs"
+  programme?: string; // e.g. "CHSLD (101)" | "Toxicomanie (263)"
   activite?: string; // code and label
   title?: string;
   notes?: string;
@@ -15,11 +16,12 @@ export interface LoggedHours {
 // Pratique options requested by user
 export const PRATIQUE_OPTIONS = [
   'CHSLD',
+  'CLSC',
   'Cabinet',
   'Soins palliatifs',
 ];
 
-// Activité codes specifically for CHSLD pratique
+// Activité codes specifically for CHSLD pratique (Programme 101)
 export const CHSLD_ACTIVITES = [
   '101015 Examens relatifs à l’hépatite C',
   '101030 Services cliniques',
@@ -35,6 +37,25 @@ export const CHSLD_ACTIVITES = [
   '101416 Réunion de service',
   '101417 Comité exécutif du CMDP',
   '101418 Comité du CMDP (excluant le comité exécutif du CMDP)',
+];
+
+// Activité codes for Programme Toxicomanie (263XXX)
+export const TOXICOMANIE_ACTIVITES = [
+  '263015 Examens relatifs à l’hépatite C',
+  '263030 Services cliniques *',
+  '263031 Étude de dossiers',
+  '263032 Rencontres multidisciplinaires',
+  '263037 Planification–Programmation–Évaluation',
+  '263043 Tâches médico-administratives et hospitalières (secteur de dispensation : 0)',
+  '263055 Communications (proches, tiers, intervenants du réseau et de la justice)',
+  '263063 Garde sur place',
+  '263071 Garde sur place à même les 35 premières heures d’activités professionnelles hebdomadaires. Pour les médecins se prévalant des dispositions du paragraphe 5.10 de l’annexe XIV, aucune limitation d’heures (TH seulement).',
+  '263098 Services de santé durant le délai de carence',
+  '263414 Assemblée du CMDP',
+  '263415 Réunion de département',
+  '263416 Réunion de service',
+  '263417 Comité exécutif du CMDP',
+  '263418 Comité du CMDP (excluant le comité exécutif du CMDP)',
 ];
 
 // Activité codes specifically for Cabinet pratique
@@ -53,13 +74,34 @@ export const SOINS_PALLIATIFS_ACTIVITES = [
   '53071 Garde sur place à même les 35 premières heures d\'activités professionnelles hebdomadaires',
 ];
 
-export function getActivitiesForPratique(pratique?: string): string[] {
+export const CLSC_PROGRAMMES = [
+  'Toxicomanie (263)',
+];
+
+export function getProgrammesForPratique(pratique?: string): string[] {
+  if (pratique === 'CLSC') return CLSC_PROGRAMMES;
+  return [];
+}
+
+export function getDefaultProgrammeForPratique(pratique?: string): string {
+  if (pratique === 'CLSC') return 'Toxicomanie (263)';
+  return '';
+}
+
+export function getActivitiesForPratique(pratique?: string, programme?: string): string[] {
+  if (programme?.includes('Toxicomanie') || (pratique === 'CLSC' && (!programme || programme.includes('Toxicomanie')))) {
+    return TOXICOMANIE_ACTIVITES;
+  }
   if (pratique === 'Cabinet') return CABINET_ACTIVITES;
   if (pratique === 'Soins palliatifs') return SOINS_PALLIATIFS_ACTIVITES;
+  if (pratique === 'CLSC') return TOXICOMANIE_ACTIVITES;
   return CHSLD_ACTIVITES;
 }
 
-export function getDefaultActiviteForPratique(pratique?: string): string {
+export function getDefaultActiviteForPratique(pratique?: string, programme?: string): string {
+  if (programme?.includes('Toxicomanie') || pratique === 'CLSC') {
+    return TOXICOMANIE_ACTIVITES[1] || TOXICOMANIE_ACTIVITES[0];
+  }
   if (pratique === 'Cabinet') return CABINET_ACTIVITES[0];
   if (pratique === 'Soins palliatifs') return SOINS_PALLIATIFS_ACTIVITES[0];
   return CHSLD_ACTIVITES[1] || CHSLD_ACTIVITES[0];
@@ -73,6 +115,7 @@ interface LogHoursModalProps {
   initialStartTime?: string;
   initialEndTime?: string;
   initialPratique?: string;
+  initialProgramme?: string;
   initialActivite?: string;
   initialLog?: LoggedHours | null;
   onDelete?: (id: string) => void;
@@ -128,7 +171,8 @@ export const LogHoursModal: React.FC<LogHoursModalProps> = ({
   initialStartTime = '08:00',
   initialEndTime = '16:00',
   initialPratique = 'CHSLD',
-  initialActivite = '101030 Services cliniques',
+  initialProgramme,
+  initialActivite,
   initialLog = null,
   onDelete,
   lang = 'fr',
@@ -148,7 +192,17 @@ export const LogHoursModal: React.FC<LogHoursModalProps> = ({
   const [startTime, setStartTime] = useState<string>(initialStartTime);
   const [endTime, setEndTime] = useState<string>(initialEndTime);
   const [pratique, setPratique] = useState<string>(initialPratique);
-  const [activite, setActivite] = useState<string>(initialActivite);
+  const [programme, setProgramme] = useState<string>(() => {
+    if (initialLog?.programme) return initialLog.programme;
+    if (initialLog?.activite?.startsWith('263')) return 'Toxicomanie (263)';
+    return initialProgramme || getDefaultProgrammeForPratique(initialPratique);
+  });
+  const [activite, setActivite] = useState<string>(() => {
+    if (initialLog?.activite) return initialLog.activite;
+    if (initialActivite) return initialActivite;
+    const prog = initialProgramme || getDefaultProgrammeForPratique(initialPratique);
+    return getDefaultActiviteForPratique(initialPratique, prog);
+  });
   const [error, setError] = useState<string>('');
 
   useEffect(() => {
@@ -158,17 +212,21 @@ export const LogHoursModal: React.FC<LogHoursModalProps> = ({
       setEndTime(initialLog.endTime);
       const pr = initialLog.pratique || 'CHSLD';
       setPratique(pr);
-      setActivite(initialLog.activite || getDefaultActiviteForPratique(pr));
+      const prog = initialLog.programme || (initialLog.activite?.startsWith('263') ? 'Toxicomanie (263)' : getDefaultProgrammeForPratique(pr));
+      setProgramme(prog);
+      setActivite(initialLog.activite || getDefaultActiviteForPratique(pr, prog));
     } else {
       if (initialDate) setDate(initialDate);
       setStartTime(initialStartTime);
       setEndTime(initialEndTime);
       const pr = initialPratique || 'CHSLD';
       setPratique(pr);
-      setActivite(initialActivite || getDefaultActiviteForPratique(pr));
+      const prog = initialProgramme || getDefaultProgrammeForPratique(pr);
+      setProgramme(prog);
+      setActivite(initialActivite || getDefaultActiviteForPratique(pr, prog));
     }
     setError('');
-  }, [isOpen, initialLog, initialDate, initialStartTime, initialEndTime, initialPratique, initialActivite]);
+  }, [isOpen, initialLog, initialDate, initialStartTime, initialEndTime, initialPratique, initialProgramme, initialActivite]);
 
   if (!isOpen) return null;
 
@@ -199,7 +257,11 @@ export const LogHoursModal: React.FC<LogHoursModalProps> = ({
     }
 
     const currentPratique = pratique || 'CHSLD';
-    const defaultAct = getDefaultActiviteForPratique(currentPratique);
+    const currentProgramme =
+      currentPratique === 'CLSC'
+        ? programme || getDefaultProgrammeForPratique(currentPratique)
+        : undefined;
+    const defaultAct = getDefaultActiviteForPratique(currentPratique, currentProgramme);
 
     const logToSave: LoggedHours = {
       id: initialLog ? initialLog.id : `log-${Date.now()}-${Math.random().toString(36).substring(2, 7)}`,
@@ -207,6 +269,7 @@ export const LogHoursModal: React.FC<LogHoursModalProps> = ({
       startTime,
       endTime,
       pratique: currentPratique,
+      programme: currentProgramme,
       activite: activite || defaultAct,
     };
 
@@ -330,9 +393,11 @@ export const LogHoursModal: React.FC<LogHoursModalProps> = ({
               id="modal-pratique-select"
               value={pratique}
               onChange={(e) => {
-                 const val = e.target.value;
-                 setPratique(val);
-                 setActivite(getDefaultActiviteForPratique(val));
+                const val = e.target.value;
+                setPratique(val);
+                const newProg = getDefaultProgrammeForPratique(val);
+                setProgramme(newProg);
+                setActivite(getDefaultActiviteForPratique(val, newProg));
               }}
               className="w-full px-3 py-2 border border-slate-300 rounded-lg text-xs sm:text-sm font-medium focus:outline-none focus:ring-2 focus:ring-indigo-500 text-slate-900 bg-white cursor-pointer"
             >
@@ -343,6 +408,32 @@ export const LogHoursModal: React.FC<LogHoursModalProps> = ({
               ))}
             </select>
           </div>
+
+          {/* Programme Dropdown (shown only when CLSC is selected) */}
+          {pratique === 'CLSC' && (
+            <div className="pt-1 animate-in fade-in duration-150">
+              <label className="block text-slate-700 font-bold mb-1.5 flex items-center gap-1.5">
+                <Layers className="w-3.5 h-3.5 text-indigo-600" />
+                {isFr ? 'Programme' : 'Programme (Program)'}
+              </label>
+              <select
+                id="modal-programme-select"
+                value={programme}
+                onChange={(e) => {
+                  const val = e.target.value;
+                  setProgramme(val);
+                  setActivite(getDefaultActiviteForPratique(pratique, val));
+                }}
+                className="w-full px-3 py-2 border border-slate-300 rounded-lg text-xs sm:text-sm font-medium focus:outline-none focus:ring-2 focus:ring-indigo-500 text-slate-900 bg-white cursor-pointer"
+              >
+                {getProgrammesForPratique(pratique).map((prog) => (
+                  <option key={prog} value={prog}>
+                    {prog}
+                  </option>
+                ))}
+              </select>
+            </div>
+          )}
 
           {/* Activité Section */}
           <div className="pt-1 animate-in fade-in duration-200">
@@ -356,7 +447,7 @@ export const LogHoursModal: React.FC<LogHoursModalProps> = ({
               onChange={(e) => setActivite(e.target.value)}
               className="w-full px-3 py-2 border border-slate-300 rounded-lg text-xs sm:text-sm font-medium focus:outline-none focus:ring-2 focus:ring-indigo-500 text-slate-900 bg-white cursor-pointer"
             >
-              {getActivitiesForPratique(pratique).map((act) => (
+              {getActivitiesForPratique(pratique, programme).map((act) => (
                 <option key={act} value={act}>
                   {act}
                 </option>

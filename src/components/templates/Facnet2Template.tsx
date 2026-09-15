@@ -16,11 +16,14 @@ export const Facnet2Template: React.FC<TemplateViewProps> = ({
   // Determine realistic physician and establishment based on practice
   const isCabinet = demande.pratique === 'Cabinet';
   const isSoinsPalliatifs = demande.pratique === 'Soins palliatifs';
+  const isCLSC = demande.pratique === 'CLSC';
 
   const defaultEtablissement = isCabinet
     ? 'TH (XXXXX) - CLINIQUE MÉDICALE'
     : isSoinsPalliatifs
     ? 'TH (XXXXX) - MAISON SOINS PALLIATIFS'
+    : isCLSC
+    ? 'TH (XXXXX) - CLSC'
     : 'TH (XXXXX) - CHSLD';
 
   return (

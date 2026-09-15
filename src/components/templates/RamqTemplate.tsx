@@ -8,11 +8,14 @@ export const RamqTemplate: React.FC<TemplateViewProps> = ({
 }) => {
   const isCabinet = demande.pratique === 'Cabinet';
   const isSoinsPalliatifs = demande.pratique === 'Soins palliatifs';
+  const isCLSC = demande.pratique === 'CLSC';
 
   const etablissementNom = isCabinet
     ? 'CLINIQUE MÉDICALE (XXXXX)'
     : isSoinsPalliatifs
     ? 'MAISON SOINS PALLIATIFS (XXXXX)'
+    : isCLSC
+    ? 'CLSC (XXXXX)'
     : 'CHSLD (XXXXX)';
 
   const etablissementNum = 'XXXXX';

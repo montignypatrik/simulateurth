@@ -19,6 +19,7 @@ import {
   formatTime12h,
   calculateDurationHours,
   getDefaultActiviteForPratique,
+  getDefaultProgrammeForPratique,
 } from './components/LogHoursModal';
 import { ModeleDemandeView } from './components/ModeleDemandeView';
 import { StatutoryHolidaysModal } from './components/StatutoryHolidaysModal';
@@ -65,6 +66,15 @@ const DEFAULT_LOGGED_HOURS: LoggedHours[] = [
     endTime: '17:00',
     pratique: 'Soins palliatifs',
     activite: '53030 Services cliniques',
+  },
+  {
+    id: 'default-log-4',
+    date: '2026-09-04',
+    startTime: '14:00',
+    endTime: '20:00',
+    pratique: 'CLSC',
+    programme: 'Toxicomanie (263)',
+    activite: '263030 Services cliniques *',
   },
 ];
 
@@ -184,6 +194,7 @@ export default function App() {
   const [modalStartTime, setModalStartTime] = useState<string>('08:00');
   const [modalEndTime, setModalEndTime] = useState<string>('16:00');
   const [modalPratique, setModalPratique] = useState<string>('CHSLD');
+  const [modalProgramme, setModalProgramme] = useState<string>('');
   const [modalActivite, setModalActivite] = useState<string>('101030 Services cliniques');
   const [editingLog, setEditingLog] = useState<LoggedHours | null>(null);
 
@@ -366,8 +377,10 @@ export default function App() {
     }
 
     const initialPrat = modalPratique || 'CHSLD';
+    const initialProg = getDefaultProgrammeForPratique(initialPrat);
     setModalPratique(initialPrat);
-    setModalActivite(getDefaultActiviteForPratique(initialPrat));
+    setModalProgramme(initialProg);
+    setModalActivite(getDefaultActiviteForPratique(initialPrat, initialProg));
     setEditingLog(null);
     setIsModalOpen(true);
   };
@@ -376,12 +389,14 @@ export default function App() {
   const handleEditLog = (log: LoggedHours, e?: React.MouseEvent) => {
     if (e) e.stopPropagation();
     const pr = log.pratique || 'CHSLD';
+    const prog = log.programme || getDefaultProgrammeForPratique(pr);
     setEditingLog(log);
     setModalDate(log.date);
     setModalStartTime(log.startTime);
     setModalEndTime(log.endTime);
     setModalPratique(pr);
-    setModalActivite(log.activite || getDefaultActiviteForPratique(pr));
+    setModalProgramme(prog);
+    setModalActivite(log.activite || getDefaultActiviteForPratique(pr, prog));
     setIsModalOpen(true);
   };
 
@@ -730,6 +745,7 @@ export default function App() {
                         const duration = calculateDurationHours(log.startTime, log.endTime);
                         const isCabinet = (log.pratique || '').toLowerCase() === 'cabinet';
                         const isSoinsPalliatifs = (log.pratique || '') === 'Soins palliatifs';
+                        const isCLSC = (log.pratique || '') === 'CLSC';
                         return (
                           <div
                             key={log.id}
@@ -739,6 +755,8 @@ export default function App() {
                                 ? 'bg-emerald-50 hover:bg-emerald-100 border-emerald-200/80 text-emerald-900'
                                 : isSoinsPalliatifs
                                 ? 'bg-amber-50 hover:bg-amber-100 border-amber-200/80 text-amber-900'
+                                : isCLSC
+                                ? 'bg-teal-50 hover:bg-teal-100 border-teal-200/80 text-teal-950'
                                 : 'bg-sky-50 hover:bg-sky-100 border-sky-200/80 text-sky-950'
                             }`}
                             title={`${log.pratique || 'CHSLD'}${log.activite ? ` • ${log.activite}` : ''}: ${log.startTime} - ${log.endTime} (${duration}h)`}
@@ -748,6 +766,8 @@ export default function App() {
                                 ? 'text-emerald-900'
                                 : isSoinsPalliatifs
                                 ? 'text-amber-900'
+                                : isCLSC
+                                ? 'text-teal-950'
                                 : 'text-sky-950'
                             }`}>
                               {log.activite || log.pratique || 'CHSLD'}
@@ -757,6 +777,8 @@ export default function App() {
                                 ? 'text-emerald-700'
                                 : isSoinsPalliatifs
                                 ? 'text-amber-800'
+                                : isCLSC
+                                ? 'text-teal-700'
                                 : 'text-sky-700'
                             }`}>
                               {duration}h
@@ -927,6 +949,7 @@ export default function App() {
                           const duration = calculateDurationHours(log.startTime, log.endTime);
                           const isCabinet = (log.pratique || '').toLowerCase() === 'cabinet';
                           const isSoinsPalliatifs = (log.pratique || '') === 'Soins palliatifs';
+                          const isCLSC = (log.pratique || '') === 'CLSC';
                           return (
                             <div
                               key={log.id}
@@ -938,6 +961,8 @@ export default function App() {
                                   ? 'bg-emerald-600/95 hover:bg-emerald-700 border border-emerald-700'
                                   : isSoinsPalliatifs
                                   ? 'bg-amber-600/95 hover:bg-amber-700 border border-amber-700'
+                                  : isCLSC
+                                  ? 'bg-teal-600/95 hover:bg-teal-700 border border-teal-700'
                                   : 'bg-[#0077c8]/95 hover:bg-[#0062a3] border border-[#005a96]'
                               }`}
                               title={`${log.pratique || 'CHSLD'}${log.activite ? ` • ${log.activite}` : ''}: ${log.startTime} – ${log.endTime}`}
@@ -950,6 +975,8 @@ export default function App() {
                                   ? 'text-emerald-100'
                                   : isSoinsPalliatifs
                                   ? 'text-amber-100'
+                                  : isCLSC
+                                  ? 'text-teal-100'
                                   : 'text-sky-100'
                               }`}>
                                 {log.startTime} – {log.endTime} ({duration}h)
@@ -1112,6 +1139,7 @@ export default function App() {
                           const duration = calculateDurationHours(log.startTime, log.endTime);
                           const isCabinet = (log.pratique || '').toLowerCase() === 'cabinet';
                           const isSoinsPalliatifs = (log.pratique || '') === 'Soins palliatifs';
+                          const isCLSC = (log.pratique || '') === 'CLSC';
                           return (
                             <div
                               key={log.id}
@@ -1123,6 +1151,8 @@ export default function App() {
                                   ? 'bg-emerald-600 hover:bg-emerald-700 border border-emerald-700'
                                   : isSoinsPalliatifs
                                   ? 'bg-amber-600 hover:bg-amber-700 border border-amber-700'
+                                  : isCLSC
+                                  ? 'bg-teal-600 hover:bg-teal-700 border border-teal-700'
                                   : 'bg-[#0077c8] hover:bg-[#0062a3] border border-[#005a96]'
                               }`}
                             >
@@ -1141,6 +1171,8 @@ export default function App() {
                                   ? 'text-emerald-100'
                                   : isSoinsPalliatifs
                                   ? 'text-amber-100'
+                                  : isCLSC
+                                  ? 'text-teal-100'
                                   : 'text-sky-100'
                               }`}>
                                 <span className={`px-1.5 py-0.5 rounded text-[11px] font-mono mr-1.5 ${
@@ -1148,6 +1180,8 @@ export default function App() {
                                     ? 'bg-emerald-700/80'
                                     : isSoinsPalliatifs
                                     ? 'bg-amber-700/80'
+                                    : isCLSC
+                                    ? 'bg-teal-700/80'
                                     : 'bg-[#005a96]'
                                 }`}>
                                   {log.activite.split(' ')[0]}
@@ -1160,6 +1194,8 @@ export default function App() {
                                 ? 'text-emerald-100'
                                 : isSoinsPalliatifs
                                 ? 'text-amber-100'
+                                : isCLSC
+                                ? 'text-teal-100'
                                 : 'text-sky-100'
                             }`}>
                               <Clock className="w-3.5 h-3.5" />
@@ -1258,6 +1294,7 @@ export default function App() {
         initialStartTime={modalStartTime}
         initialEndTime={modalEndTime}
         initialPratique={modalPratique}
+        initialProgramme={modalProgramme}
         initialActivite={modalActivite}
         initialLog={editingLog}
         onDelete={handleDeleteLog}

@@ -10,11 +10,14 @@ export const Facnet3Template: React.FC<TemplateViewProps> = ({
 
   const isCabinet = demande.pratique === 'Cabinet';
   const isSoinsPalliatifs = demande.pratique === 'Soins palliatifs';
+  const isCLSC = demande.pratique === 'CLSC';
 
   const lieuNom = isCabinet
     ? 'XXXXX - CLINIQUE MÉDICALE'
     : isSoinsPalliatifs
     ? 'XXXXX - MAISON DE SOINS PALLIATIFS'
+    : isCLSC
+    ? 'XXXXX - CLSC'
     : 'XXXXX - CHSLD';
 
   return (
