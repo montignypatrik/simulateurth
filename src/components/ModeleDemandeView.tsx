@@ -1,10 +1,12 @@
 import React, { useState } from 'react';
-import { ChevronLeft, Calendar as CalendarIcon, FileText, Clock, ChevronDown, Layers, Sparkles } from 'lucide-react';
-import { LoggedHours, calculateDurationHours } from './LogHoursModal';
+import { ChevronLeft, FileText, Clock, Layers, Sparkles } from 'lucide-react';
+import type { LoggedHours } from './LogHoursModal';
+import { buildDemandes } from '../utils/buildDemandes';
+export { calculateSecteur } from '../utils/billingRules';
 import { Facnet2Template } from './templates/Facnet2Template';
 import { Facnet3Template } from './templates/Facnet3Template';
 import { RamqTemplate } from './templates/RamqTemplate';
-import { TemplateId, DemandeRowSlot, DemandeRow, DemandeWeek, PlageId } from './templates/types';
+import { TemplateId, DemandeWeek } from './templates/types';
 import { isStatutoryHoliday } from '../data/statutoryHolidays';
 import { FacnetLogo } from './FacnetLogo';
 
@@ -14,20 +16,6 @@ interface ModeleDemandeViewProps {
   lang?: 'fr' | 'en';
   onToggleLang?: (newLang: 'fr' | 'en') => void;
 }
-
-interface PlageDef {
-  id: PlageId;
-  label: string;
-  startMin: number; // minutes from 00:00
-  endMin: number;   // minutes from 00:00
-}
-
-const PLAGES: PlageDef[] = [
-  { id: 'NU', label: 'NU', startMin: 0, endMin: 8 * 60 },       // 00h - 08h
-  { id: 'AM', label: 'AM', startMin: 8 * 60, endMin: 12 * 60 },  // 08h - 12h
-  { id: 'PM', label: 'PM', startMin: 12 * 60, endMin: 20 * 60 }, // 12h - 20h
-  { id: 'SO', label: 'SO', startMin: 20 * 60, endMin: 24 * 60 }, // 20h - 24h
-];
 
 const TEMPLATE_STORAGE_KEY = 'demande_active_template';
 const TEMPLATE_PROMPT_ANSWERED_KEY = 'demande_platform_prompt_answered';
@@ -65,226 +53,6 @@ const TEMPLATE_OPTIONS: {
     dotClass: 'bg-sky-300',
   },
 ];
-
-const JOUR_ABBR_FR: { [key: number]: string } = {
-  0: 'dim.',
-  1: 'lun.',
-  2: 'mar.',
-  3: 'mer.',
-  4: 'jeu.',
-  5: 'ven.',
-  6: 'sam.',
-};
-
-const JOUR_ABBR_EN: { [key: number]: string } = {
-  0: 'Sun.',
-  1: 'Mon.',
-  2: 'Tue.',
-  3: 'Wed.',
-  4: 'Thu.',
-  5: 'Fri.',
-  6: 'Sat.',
-};
-
-// Helper: parse YYYY-MM-DD
-function parseLocalDate(dateStr: string): Date {
-  const [y, m, d] = dateStr.split('-').map(Number);
-  return new Date(y, m - 1, d);
-}
-
-// Helper: format YYYY-MM-DD
-function toDateKey(d: Date): string {
-  const y = d.getFullYear();
-  const m = (d.getMonth() + 1).toString().padStart(2, '0');
-  const day = d.getDate().toString().padStart(2, '0');
-  return `${y}-${m}-${day}`;
-}
-
-// Format Quantième display e.g. "mar. 09-01"
-function formatQuantieme(dateStr: string, isFr: boolean): string {
-  const d = parseLocalDate(dateStr);
-  const dayOfWeek = d.getDay();
-  const abbr = isFr ? JOUR_ABBR_FR[dayOfWeek] : JOUR_ABBR_EN[dayOfWeek];
-  const m = (d.getMonth() + 1).toString().padStart(2, '0');
-  const day = d.getDate().toString().padStart(2, '0');
-  return `${abbr} ${m}-${day}`;
-}
-
-// Extract 6-digit code or primary code from activite string
-function extractCode(activite?: string, defaultCode = ''): string {
-  if (!activite) return defaultCode;
-  const match = activite.match(/^(\d{5,6})/);
-  if (match) return match[1];
-  return activite.split(' ')[0] || defaultCode;
-}
-
-function timeToMinutes(timeStr: string): number {
-  const [h, m] = timeStr.split(':').map(Number);
-  return h * 60 + m;
-}
-
-// Calculate overlap in hours between a shift [start, end] and a plage [plageStart, plageEnd]
-function calculateOverlapHours(shiftStart: string, shiftEnd: string, plageStartMin: number, plageEndMin: number): number {
-  let sMin = timeToMinutes(shiftStart);
-  let eMin = timeToMinutes(shiftEnd);
-
-  // If ends at 00:00 or smaller than start, wrap to 24h (1440 min)
-  if (eMin <= sMin) {
-    eMin += 24 * 60;
-  }
-
-  // Calculate overlap
-  const oStart = Math.max(sMin, plageStartMin);
-  const oEnd = Math.min(eMin, plageEndMin);
-
-  if (oEnd > oStart) {
-    return Math.round(((oEnd - oStart) / 60) * 100) / 100;
-  }
-  return 0;
-}
-
-// Logic for secteur based on day, plage, code, and pratique:
-// - For code 072101 (Activités de fonctionnement en GMF) or practice Cabinet: secteur is ALWAYS 0
-// - For codes 043 (Tâches médico-administratives et hospitalières: 263043, 53043, 101043):
-//   secteur 0 ONLY during the practice's regular weekday day period (no majoration).
-//   Evenings, weekends and holidays follow the practice's normal secteur table below
-//   (with their majorations) instead.
-// - For Programmes en CLSC (pratique CLSC or code starting with 263 / Toxicomanie):
-//     - En semaine de 8h à 18h (plages AM, PM) = 1 (Majoration n/a)
-//     - Lundi, mardi, mercredi et jeudi de 18h à 20h (plage PM) = 23 (Majoration 16%)
-//     - Lundi, mardi, mercredi et jeudi de 20h à 22h (plage SO) = 24 (Majoration 16%)
-//     - Vendredi de 18h à 20h (plage PM) = 25 (Majoration 26%)
-//     - Vendredi de 20h à 22h (plage SO) = 26 (Majoration 26%)
-//     - Samedi, dimanche et jours fériés de 8h à 24h (plages AM, PM, SO) = 27 (Majoration 26%) [ou 28 clinique réseau]
-//     - Samedi, dimanche et jours fériés de 0h à 8h (plage NU) = 42
-// - For Soins palliatifs:
-//     - En semaine de 8h à 20h (plages AM, PM) = 0
-//     - Lundi, mardi, mercredi et jeudi de 20h à 24h (plage SO) = 29
-//     - Vendredi de 20h à 24h (plage SO) = 30
-//     - Samedi, dimanche et jours fériés de 8h à 24h (plages AM, PM, SO) = 31
-//     - Samedi, dimanche et jours fériés de 0h à 8h (plage NU) = 42
-// - For CHSLD:
-//     - En semaine de 8h à 20h (plages AM, PM) = 4
-//     - Lundi, mardi, mercredi et jeudi de 20h à 24h (plage SO) = 29
-//     - Vendredi de 20h à 24h (plage SO) = 30
-//     - Samedi, dimanche et jours fériés de 8h à 24h (plages AM, PM, SO) = 31
-//     - Samedi, dimanche et jours fériés de 0h à 8h (plage NU) = 42
-export function calculateSecteur(
-  dateStr: string,
-  plageId: PlageId,
-  code?: string,
-  pratique?: string,
-  startHourMin?: number,
-  endHourMin?: number
-): string {
-  // Sector rule: code 072101 or Cabinet practice is ALWAYS 0
-  if (code === '072101' || code?.startsWith('072101') || pratique === 'Cabinet') {
-    return '0';
-  }
-
-  // Codes 043 (Tâches médico-administratives et hospitalières):
-  // secteur 0 applies only during the practice's regular weekday day period (no majoration).
-  // Evenings, weekends and holidays follow the practice's secteur table instead.
-  const isAdminTask =
-    code === '263043' ||
-    code?.startsWith('263043') ||
-    code === '53043' ||
-    code?.startsWith('53043') ||
-    code === '101043' ||
-    code?.startsWith('101043');
-
-  const d = parseLocalDate(dateStr);
-  const day = d.getDay(); // 0 = Sunday, 1 = Monday, ..., 5 = Friday, 6 = Saturday
-  const isWeekend = day === 0 || day === 6;
-  const isHoliday = isStatutoryHoliday(dateStr);
-
-  const isClscProgram = pratique === 'CLSC' || code?.startsWith('263');
-
-  if (isClscProgram) {
-    if (isWeekend || isHoliday) {
-      if (plageId === 'NU') {
-        // Samedi, dimanche et jours fériés de 0h à 8h = 42
-        return '42';
-      }
-      // Samedi, dimanche et jours fériés de 8h à 24h (AM, PM, SO) = 27 (26% Majoration)
-      return '27';
-    }
-
-    // Weekdays (Monday to Friday)
-    if (plageId === 'AM') {
-      // En semaine de 8h à 18h = 1 (n/a Majoration); codes 043 = 0
-      return isAdminTask ? '0' : '1';
-    }
-
-    if (plageId === 'PM') {
-      // If we know the sub-period:
-      if (startHourMin !== undefined && startHourMin >= 18 * 60) {
-        // Vendredi de 18h à 20h = 25 (26% Majoration)
-        if (day === 5) return '25';
-        // Lundi, mardi, mercredi et jeudi de 18h à 20h = 23 (16% Majoration)
-        return '23';
-      }
-      if (endHourMin !== undefined && endHourMin <= 18 * 60) {
-        // En semaine de 8h à 18h = 1 (n/a Majoration); codes 043 = 0
-        return isAdminTask ? '0' : '1';
-      }
-      // Default: En semaine de 8h à 18h = 1; codes 043 = 0
-      return isAdminTask ? '0' : '1';
-    }
-
-    if (plageId === 'SO') {
-      // Vendredi de 20h à 22h = 26 (26% Majoration)
-      if (day === 5) {
-        return '26';
-      }
-      // Lundi, mardi, mercredi et jeudi de 20h à 22h = 24 (16% Majoration)
-      if (day >= 1 && day <= 4) {
-        return '24';
-      }
-      return '24';
-    }
-
-    if (plageId === 'NU') {
-      return '42';
-    }
-
-    return '1';
-  }
-
-  // CHSLD / Soins palliatifs standard:
-  if (isWeekend || isHoliday) {
-    if (plageId === 'NU') {
-      // Samedi, dimanche et jours fériés de 0h à 8h = 42
-      return '42';
-    }
-    // Samedi, dimanche et jours fériés de 8h à 24h (AM, PM, SO) = 31
-    return '31';
-  }
-
-  // Weekdays (Monday to Friday)
-  if (plageId === 'AM' || plageId === 'PM') {
-    // Soins palliatifs: En semaine de 8h à 20h = 0
-    if (pratique === 'Soins palliatifs') {
-      return '0';
-    }
-    // CHSLD: En semaine de 8h à 20h = 4; codes 043 = 0
-    return isAdminTask ? '0' : '4';
-  }
-
-  if (plageId === 'SO') {
-    if (day >= 1 && day <= 4) {
-      // Lundi, mardi, mercredi et jeudi de 20h à 24h = 29
-      return '29';
-    }
-    if (day === 5) {
-      // Vendredi de 20h à 24h = 30
-      return '30';
-    }
-  }
-
-  return '';
-}
-
 
 export const ModeleDemandeView: React.FC<ModeleDemandeViewProps> = ({
   loggedHours,
@@ -332,232 +100,9 @@ export const ModeleDemandeView: React.FC<ModeleDemandeViewProps> = ({
     setIsTemplatePromptOpen(false);
   };
 
-  // Build the Demandes:
-  // RULE: A demande is strictly linked to a single pratique. Different pratique = different demande!
-  // Demande is identified by (Sunday to Saturday week + pratique).
-  const demandes: DemandeWeek[] = React.useMemo(() => {
-    const demandMap = new Map<
-      string,
-      { sundayDate: Date; sundayKey: string; pratique: string; logs: LoggedHours[] }
-    >();
-
-    loggedHours.forEach((log) => {
-      const logPratique = log.pratique || 'CHSLD';
-      const logDate = parseLocalDate(log.date);
-      const dayOfWeek = logDate.getDay(); // 0 = Sun, 6 = Sat
-
-      // Find Sunday
-      const sunday = new Date(
-        logDate.getFullYear(),
-        logDate.getMonth(),
-        logDate.getDate() - dayOfWeek
-      );
-      const sundayKey = toDateKey(sunday);
-      const groupKey = `${sundayKey}__${logPratique}`;
-
-      if (!demandMap.has(groupKey)) {
-        demandMap.set(groupKey, {
-          sundayDate: sunday,
-          sundayKey,
-          pratique: logPratique,
-          logs: [],
-        });
-      }
-      demandMap.get(groupKey)!.logs.push(log);
-    });
-
-    // Sort: primary chronological by sundayKey, secondary by pratique (CHSLD before Cabinet)
-    const sortedEntries = Array.from(demandMap.values()).sort((a, b) => {
-      if (a.sundayKey !== b.sundayKey) {
-        return a.sundayKey.localeCompare(b.sundayKey);
-      }
-      return a.pratique.localeCompare(b.pratique);
-    });
-
-    const result: DemandeWeek[] = [];
-
-    sortedEntries.forEach((entry) => {
-      const sunday = entry.sundayDate;
-      const saturday = new Date(sunday.getFullYear(), sunday.getMonth(), sunday.getDate() + 6);
-      const demandPratique = entry.pratique;
-
-      // Prepare 7 days of the week options for the Quantième dropdown
-      const daysOptions: { dateStr: string; display: string }[] = [];
-      for (let d = 0; d < 7; d++) {
-        const cur = new Date(sunday.getFullYear(), sunday.getMonth(), sunday.getDate() + d);
-        const curStr = toDateKey(cur);
-        daysOptions.push({
-          dateStr: curStr,
-          display: formatQuantieme(curStr, isFr),
-        });
-      }
-
-      // Generate rows based on the plage horaire logic:
-      // NU (00h-08h), AM (08h-12h), PM (12h-20h), SO (20h-24h)
-      const rows: DemandeRow[] = [];
-      let itemCounter = 1; // Sequential item numbers: 1,2,3 for row 1; 4,5,6 for row 2; etc.
-
-      // Group this demande's logs by date
-      const logsByDate = new Map<string, LoggedHours[]>();
-      entry.logs.forEach((log) => {
-        if (!logsByDate.has(log.date)) {
-          logsByDate.set(log.date, []);
-        }
-        logsByDate.get(log.date)!.push(log);
-      });
-
-      // Sort dates chronologically
-      const sortedDates = Array.from(logsByDate.keys()).sort();
-
-      sortedDates.forEach((dateStr) => {
-        const dateLogs = logsByDate.get(dateStr)!;
-
-        // For each of the 4 plages in order (NU, AM, PM, SO)
-        PLAGES.forEach((plage) => {
-          // Find logs that have overlap with this plage
-          const matchingItems: { code: string; secteur: string; hours: number }[] = [];
-
-          const d = parseLocalDate(dateStr);
-          const day = d.getDay();
-          const isWeekend = day === 0 || day === 6;
-          const isHoliday = isStatutoryHoliday(dateStr);
-          const isWeekday = !isWeekend && !isHoliday;
-
-          const defCode =
-            demandPratique === 'Cabinet'
-              ? '072101'
-              : demandPratique === 'Soins palliatifs'
-              ? '53030'
-              : demandPratique === 'CLSC'
-              ? '263030'
-              : '101030';
-
-          dateLogs.forEach((log) => {
-            const code = extractCode(log.activite, defCode);
-            const isClscProgram =
-              demandPratique === 'CLSC' ||
-              log.pratique === 'CLSC' ||
-              code.startsWith('263') ||
-              log.programme?.includes('Toxicomanie');
-
-            // Special case for CLSC on weekdays in plage PM:
-            // 12h-18h is Secteur 1, and 18h-20h is Secteur 23 (Mon-Thu) or 25 (Fri)
-            if (isClscProgram && isWeekday && plage.id === 'PM') {
-              const overlapBefore18 = calculateOverlapHours(log.startTime, log.endTime, 12 * 60, 18 * 60);
-              const overlapAfter18 = calculateOverlapHours(log.startTime, log.endTime, 18 * 60, 20 * 60);
-
-              if (overlapBefore18 > 0) {
-                const sect1 = calculateSecteur(dateStr, 'PM', code, demandPratique, 12 * 60, 18 * 60);
-                matchingItems.push({ code, secteur: sect1, hours: overlapBefore18 });
-              }
-              if (overlapAfter18 > 0) {
-                const sect2 = calculateSecteur(dateStr, 'PM', code, demandPratique, 18 * 60, 20 * 60);
-                matchingItems.push({ code, secteur: sect2, hours: overlapAfter18 });
-              }
-            } else {
-              const overlap = calculateOverlapHours(
-                log.startTime,
-                log.endTime,
-                plage.startMin,
-                plage.endMin
-              );
-              if (overlap > 0) {
-                const sect = calculateSecteur(dateStr, plage.id, code, demandPratique);
-                matchingItems.push({ code, secteur: sect, hours: overlap });
-              }
-            }
-          });
-
-          // If there is activity in this plage, create a row!
-          if (matchingItems.length > 0) {
-            // Group matching items by (code + '__' + secteur):
-            // Medical billing rule: items with the same activity code and sector are combined on the same slot.
-            const groupsMap = new Map<string, { code: string; secteur: string; totalHours: number }>();
-
-            matchingItems.forEach(({ code, secteur, hours }) => {
-              const key = `${code}__${secteur}`;
-              if (!groupsMap.has(key)) {
-                groupsMap.set(key, { code, secteur, totalHours: 0 });
-              }
-              groupsMap.get(key)!.totalHours += hours;
-            });
-
-            const uniqueCodeGroups = Array.from(groupsMap.values()).map((g) => ({
-              code: g.code,
-              secteur: g.secteur,
-              heures: Math.round(g.totalHours * 100) / 100,
-            }));
-
-            // In case there are > 3 different activity codes/sectors in the same plage, chunk into rows of 3 slots
-            for (let chunkIdx = 0; chunkIdx < uniqueCodeGroups.length; chunkIdx += 3) {
-              const chunk = uniqueCodeGroups.slice(chunkIdx, chunkIdx + 3);
-              const slot1Data = chunk[0] || null;
-              const slot2Data = chunk[1] || null;
-              const slot3Data = chunk[2] || null;
-
-              const slot1Num = itemCounter++;
-              const slot2Num = itemCounter++;
-              const slot3Num = itemCounter++;
-
-              const slot1: DemandeRowSlot = {
-                slotNum: slot1Num,
-                code: slot1Data ? slot1Data.code : '',
-                secteur: slot1Data ? slot1Data.secteur : '',
-                heures: slot1Data ? slot1Data.heures : '',
-              };
-
-              const slot2: DemandeRowSlot = {
-                slotNum: slot2Num,
-                code: slot2Data ? slot2Data.code : '',
-                secteur: slot2Data ? slot2Data.secteur : '',
-                heures: slot2Data ? slot2Data.heures : '',
-              };
-
-              const slot3: DemandeRowSlot = {
-                slotNum: slot3Num,
-                code: slot3Data ? slot3Data.code : '',
-                secteur: slot3Data ? slot3Data.secteur : '',
-                heures: slot3Data ? slot3Data.heures : '',
-              };
-
-              const chunkTotal = chunk.reduce((sum, c) => sum + c.heures, 0);
-
-              rows.push({
-                rowId:
-                  chunkIdx === 0
-                    ? `${dateStr}_${plage.id}`
-                    : `${dateStr}_${plage.id}_${chunkIdx}`,
-                dateStr,
-                quantiemeDisplay: formatQuantieme(dateStr, isFr),
-                mode: 'TH',
-                selectedPlage: plage.id,
-                slots: [slot1, slot2, slot3],
-                totalHeures: Math.round(chunkTotal * 100) / 100,
-              });
-            }
-          }
-        });
-      });
-
-      const totalDemandeHeures = rows.reduce((sum, r) => sum + r.totalHeures, 0);
-
-      if (totalDemandeHeures > 0) {
-        result.push({
-          id: `${entry.sundayKey}__${demandPratique}`,
-          pratique: demandPratique,
-          startDate: sunday,
-          endDate: saturday,
-          startDateStr: entry.sundayKey,
-          endDateStr: toDateKey(saturday),
-          daysOptions,
-          rows,
-          totalDemandeHeures: Math.round(totalDemandeHeures * 100) / 100,
-        });
-      }
-    });
-
-    return result;
-  }, [loggedHours, isFr]);
+  const demandes: DemandeWeek[] = React.useMemo(
+    () => buildDemandes(loggedHours, isFr), [loggedHours, isFr]
+  );
 
   const activeDemandeIdx = Math.min(
     selectedDemandeIndex,
@@ -788,7 +333,7 @@ export const ModeleDemandeView: React.FC<ModeleDemandeViewProps> = ({
             <div className="flex flex-wrap items-center justify-between gap-3 border-b border-neutral-300 pb-3">
               <div className="flex flex-wrap items-center gap-3">
                 {/* Tab toggle at the top: Demande #1 / Demande #2 */}
-                <div className="inline-flex p-1 bg-neutral-200/90 rounded-xl border border-neutral-300 shadow-2xs gap-1">
+                <div className="flex flex-wrap p-1 bg-neutral-200/90 rounded-xl border border-neutral-300 shadow-2xs gap-1">
                   {demandes.map((d, idx) => {
                     const isActive = idx === activeDemandeIdx;
                     const isCabinet = d.pratique === 'Cabinet';
@@ -800,7 +345,7 @@ export const ModeleDemandeView: React.FC<ModeleDemandeViewProps> = ({
                         key={d.id}
                         id={`demande-tab-${idx}`}
                         onClick={() => setSelectedDemandeIndex(idx)}
-                        className={`px-3 sm:px-4 py-1.5 text-xs sm:text-sm font-bold rounded-lg transition-all cursor-pointer flex items-center gap-2 ${
+                        className={`px-3 sm:px-4 py-1.5 text-xs sm:text-sm font-bold rounded-lg transition-all cursor-pointer flex items-center gap-2 whitespace-nowrap ${
                           isActive
                             ? 'bg-white text-slate-900 shadow-xs border border-neutral-300/80'
                             : 'text-slate-600 hover:text-slate-900 hover:bg-white/60'
@@ -849,6 +394,19 @@ export const ModeleDemandeView: React.FC<ModeleDemandeViewProps> = ({
             </div>
 
             {/* Currently selected Demande Rendered According to Template */}
+            {currentDemande.sectorIssues.length > 0 && (
+              <div role="alert" className="rounded-lg border border-amber-300 bg-amber-50 p-4 text-sm text-amber-950">
+                <p className="font-semibold">{isFr ? 'Secteurs à valider' : 'Sectors to validate'}</p>
+                <p>{isFr
+                  ? 'Les guides ne précisent pas le secteur pour les périodes ci-dessous. Les heures sont conservées et les secteurs concernés restent vides.'
+                  : 'The guides do not specify a sector for the periods below. Hours are retained and the affected sectors are left blank.'}</p>
+                <ul className="mt-2 list-disc pl-5">
+                  {currentDemande.sectorIssues.map((issue, index) => (
+                    <li key={index}>{issue.date} · {issue.startTime}–{issue.endTime} · {issue.programme || currentDemande.pratique} · {issue.code}</li>
+                  ))}
+                </ul>
+              </div>
+            )}
             <div key={`${currentDemande.id}_${selectedTemplate}`}>
               {selectedTemplate === 'facnet2' && (
                 <Facnet2Template

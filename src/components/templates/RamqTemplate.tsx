@@ -1,3 +1,4 @@
+import { getEstablishmentLabel } from '../../data/billingCatalog';
 import React from 'react';
 import { Calendar, Plus } from 'lucide-react';
 import { TemplateViewProps } from './types';
@@ -6,17 +7,7 @@ export const RamqTemplate: React.FC<TemplateViewProps> = ({
   demande,
   isFr,
 }) => {
-  const isCabinet = demande.pratique === 'Cabinet';
-  const isSoinsPalliatifs = demande.pratique === 'Soins palliatifs';
-  const isCLSC = demande.pratique === 'CLSC';
-
-  const etablissementNom = isCabinet
-    ? 'CLINIQUE MÉDICALE (XXXXX)'
-    : isSoinsPalliatifs
-    ? 'MAISON SOINS PALLIATIFS (XXXXX)'
-    : isCLSC
-    ? 'CLSC (XXXXX)'
-    : 'CHSLD (XXXXX)';
+  const etablissementNom = `${getEstablishmentLabel(demande.pratique)} (XXXXX)`;
 
   const etablissementNum = 'XXXXX';
 

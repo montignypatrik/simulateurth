@@ -21,7 +21,7 @@ export interface DemandeRow {
 
 export interface DemandeWeek {
   id: string; // Sunday date + pratique: YYYY-MM-DD__Pratique
-  pratique: string; // "CHSLD" | "Cabinet" | "Soins palliatifs"
+  pratique: string;
   startDate: Date;
   endDate: Date;
   startDateStr: string;
@@ -29,6 +29,7 @@ export interface DemandeWeek {
   daysOptions: { dateStr: string; display: string }[];
   rows: DemandeRow[];
   totalDemandeHeures: number;
+  sectorIssues: { date: string; startTime: string; endTime: string; code: string; programme?: string }[];
 }
 
 export interface TemplateViewProps {

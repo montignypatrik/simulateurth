@@ -1,3 +1,4 @@
+import { getEstablishmentLabel } from '../../data/billingCatalog';
 import React from 'react';
 import { Calendar, Plus } from 'lucide-react';
 import { TemplateViewProps, PlageId } from './types';
@@ -14,17 +15,7 @@ export const Facnet2Template: React.FC<TemplateViewProps> = ({
   isFr,
 }) => {
   // Determine realistic physician and establishment based on practice
-  const isCabinet = demande.pratique === 'Cabinet';
-  const isSoinsPalliatifs = demande.pratique === 'Soins palliatifs';
-  const isCLSC = demande.pratique === 'CLSC';
-
-  const defaultEtablissement = isCabinet
-    ? 'TH (XXXXX) - CLINIQUE MÉDICALE'
-    : isSoinsPalliatifs
-    ? 'TH (XXXXX) - MAISON SOINS PALLIATIFS'
-    : isCLSC
-    ? 'TH (XXXXX) - CLSC'
-    : 'TH (XXXXX) - CHSLD';
+  const defaultEtablissement = `TH (XXXXX) - ${getEstablishmentLabel(demande.pratique)}`;
 
   return (
     <div className="bg-[#f2f5f5] rounded-xl border border-[#c7d5d5] p-4 sm:p-6 shadow-xs font-sans text-slate-800">

@@ -77,15 +77,15 @@ export const StatutoryHolidaysModal: React.FC<StatutoryHolidaysModalProps> = ({
             </span>{' '}
             {isFr ? (
               <span>
-                Pour ces journées fériées, le secteur attribué est automatiquement{' '}
-                <strong className="font-mono bg-amber-200/70 px-1 py-0.2 rounded">31</strong> (plages AM, PM, SO de 8h à 24h) et{' '}
-                <strong className="font-mono bg-amber-200/70 px-1 py-0.2 rounded">42</strong> (plage NU de 0h à 8h). En cabinet ou pour les codes 072101 et 53043, le secteur demeure 0.
+                Le secteur férié dépend de la pratique, du programme et de l’activité : 31 / 42 en milieu hospitalier,
+                27 en CLSC / GMF-U le jour, ou 28 au sans rendez-vous d’une clinique-réseau.
+                Les activités à secteur 0 conservent ce secteur. Les périodes non précisées dans les guides sont signalées dans la demande.
               </span>
             ) : (
               <span>
-                On these statutory holidays, sector is automatically set to{' '}
-                <strong className="font-mono bg-amber-200/70 px-1 py-0.2 rounded">31</strong> (AM, PM, EV from 8h-24h) and{' '}
-                <strong className="font-mono bg-amber-200/70 px-1 py-0.2 rounded">42</strong> (night NU from 0h-8h).
+                Holiday sectors depend on practice, program and activity: 31 / 42 in hospital settings,
+                27 in CLSC / GMF-U during the day, or 28 for network walk-in services.
+                Activities assigned sector 0 keep that sector. Periods not covered by the guides are flagged in the request.
               </span>
             )}
           </div>

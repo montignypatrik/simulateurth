@@ -2,6 +2,9 @@
 
 Static React app for logging hourly work periods and generating Facnet/RAMQ request models.
 
+Billing practices, programs, source pages and sector rules are documented in
+[the billing guide mapping](docs/billing-guide-mapping.md).
+
 ## Run Locally
 
 Prerequisite: Node.js 22 or newer.
@@ -16,6 +19,8 @@ npm run dev
 ```bash
 npm run build
 ```
+
+Run `npm test` for billing-rule and request-template checks, and `npm run lint` for TypeScript validation.
 
 The static site is generated in `dist/`.
 

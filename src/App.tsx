@@ -759,7 +759,7 @@ export default function App() {
                                 ? 'bg-teal-50 hover:bg-teal-100 border-teal-200/80 text-teal-950'
                                 : 'bg-sky-50 hover:bg-sky-100 border-sky-200/80 text-sky-950'
                             }`}
-                            title={`${log.pratique || 'CHSLD'}${log.activite ? ` • ${log.activite}` : ''}: ${log.startTime} - ${log.endTime} (${duration}h)`}
+                            title={`${log.pratique || 'CHSLD'}${log.programme ? ` • ${log.programme}` : ''}${log.activite ? ` • ${log.activite}` : ''}: ${log.startTime} - ${log.endTime} (${duration}h)`}
                           >
                             <span className={`truncate font-semibold ${
                               isCabinet
@@ -965,7 +965,7 @@ export default function App() {
                                   ? 'bg-teal-600/95 hover:bg-teal-700 border border-teal-700'
                                   : 'bg-[#0077c8]/95 hover:bg-[#0062a3] border border-[#005a96]'
                               }`}
-                              title={`${log.pratique || 'CHSLD'}${log.activite ? ` • ${log.activite}` : ''}: ${log.startTime} – ${log.endTime}`}
+                              title={`${log.pratique || 'CHSLD'}${log.programme ? ` • ${log.programme}` : ''}${log.activite ? ` • ${log.activite}` : ''}: ${log.startTime} – ${log.endTime}`}
                             >
                               <div className="font-bold truncate text-[11px] leading-tight">
                                 {log.activite || log.pratique || 'CHSLD'}
@@ -1036,7 +1036,7 @@ export default function App() {
                           {isFr ? dayHoliday.name : dayHoliday.nameEn} ({isFr ? 'Fête légale' : 'Statutory Holiday'})
                         </span>
                         <span className="text-amber-800 text-[11px] font-medium hidden sm:inline">
-                          • {isFr ? 'Secteur férié 31 / 42 applicable' : 'Holiday sector 31 / 42 applies'}
+                          • {isFr ? 'Secteur selon la pratique et le programme' : 'Sector depends on practice and program'}
                         </span>
                       </div>
                     );
@@ -1165,6 +1165,7 @@ export default function App() {
                                 {duration} {duration === 1 ? (isFr ? 'heure' : 'hour') : isFr ? 'heures' : 'hours'}
                               </span>
                             </div>
+                            {log.programme && <div className="mt-1 truncate text-xs text-white/90">{log.programme}</div>}
                             {log.activite && (
                               <div className={`text-xs font-medium mt-1 ${
                                 isCabinet

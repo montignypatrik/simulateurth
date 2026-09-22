@@ -1,3 +1,4 @@
+import { getEstablishmentLabel } from '../../data/billingCatalog';
 import React, { useState } from 'react';
 import { ChevronDown, ChevronUp, Plus, Trash2 } from 'lucide-react';
 import { TemplateViewProps } from './types';
@@ -8,17 +9,7 @@ export const Facnet3Template: React.FC<TemplateViewProps> = ({
   const [isProfOpen, setIsProfOpen] = useState(true);
   const [isLieuOpen, setIsLieuOpen] = useState(true);
 
-  const isCabinet = demande.pratique === 'Cabinet';
-  const isSoinsPalliatifs = demande.pratique === 'Soins palliatifs';
-  const isCLSC = demande.pratique === 'CLSC';
-
-  const lieuNom = isCabinet
-    ? 'XXXXX - CLINIQUE MÉDICALE'
-    : isSoinsPalliatifs
-    ? 'XXXXX - MAISON DE SOINS PALLIATIFS'
-    : isCLSC
-    ? 'XXXXX - CLSC'
-    : 'XXXXX - CHSLD';
+  const lieuNom = `XXXXX - ${getEstablishmentLabel(demande.pratique)}`;
 
   return (
     <div className="space-y-4 font-sans text-slate-800">
